@@ -29,7 +29,7 @@ const getUserData = async (user_id) => {
              users.email,
              users.phone,
              users.description,
-             users.hash      
+             users.hash
       FROM users
                INNER JOIN roles ON users.role_id = roles.id
       WHERE users.id = $1
@@ -154,7 +154,9 @@ async function generateRandomLetters(length) {
   }
 
   try {
-    let duplicateHash = await db.query(`SELECT id FROM users WHERE hash = $1`, [randomLetters]);
+    let duplicateHash = await db.query(`SELECT id
+                                        FROM users
+                                        WHERE hash = $1`, [randomLetters]);
     if (duplicateHash.rows.length > 0) {
       // If hash already exists in the database, recursively call generateRandomLetters again
       randomLetters = await generateRandomLetters(length);
@@ -177,6 +179,17 @@ router.post(`/admin/${prefix}/store`, authenticate, [
       .notEmpty()
       .withMessage('Password must be at least 6 characters long.')],
   async (req, res) => {
+    const user = await db.query(`
+        SELECT users.role_id,
+               roles.name
+        FROM users
+                 INNER JOIN roles
+                            ON users.role_id = roles.id
+        where roles.name = 'admin'
+    `)
+    if (!user.rows.length) {
+      return send(res, 403);
+    }
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return send(res, 400, errors?.errors[0]?.msg);
@@ -245,6 +258,29 @@ router.get(`/admin/${prefix}`, authenticate, async (req, res) => {
     `);
 
     return send(res, 200, users.rows);
+  } catch (error) {
+    console.error('Error fetching user account:', error);
+    return send(res, 500, 'Error fetching users');
+  }
+});
+
+router.get(`/hash/:hash`, async (req, res) => {
+  try {
+    const user = await db.query(`
+        SELECT users.id,
+               users.hash,
+               roles.name as role
+        FROM users
+                 INNER JOIN roles
+                            ON users.role_id = roles.id
+        where hash = $1
+    `, [req.params.hash]);
+    if (!user.rows.length) {
+      return send(res, 404);
+    }
+    console.log(user.rows[0].id)
+    let data = await getUserData(user.rows[0].id);
+    return send(res, 200, data);
   } catch (error) {
     console.error('Error fetching user account:', error);
     return send(res, 500, 'Error fetching users');
