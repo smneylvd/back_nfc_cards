@@ -28,9 +28,9 @@ const getUserData = async (user_id) => {
              users.middle_name,
              users.email,
              users.phone,
-             users.description
-
-users.hash,      FROM users
+             users.description,
+             users.hash      
+      FROM users
                INNER JOIN roles ON users.role_id = roles.id
       WHERE users.id = $1
   `, [user_id]);
