@@ -19,8 +19,8 @@ const send = require("./src/transformers/message");
 dotenv.config();
 
 app.use(cors());
-app.use(bodyParser.json({limit: '10mb'}));
-app.use(bodyParser.urlencoded({limit: '10mb', extended: true}));
+app.use(bodyParser.json({limit: `${process.env.FILE_UPLOAD_LIMIT}mb`}));
+app.use(bodyParser.urlencoded({limit: `${process.env.FILE_UPLOAD_LIMIT}mb`, extended: true}));
 app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 const storage = multer.diskStorage({
@@ -38,6 +38,7 @@ const storage = multer.diskStorage({
 });
 
 const fileFilter = (req, file, cb) => {
+  // note: uncomment if you want to filter uploaded files extension
   // if (file.mimetype.startsWith('image/')) {
   cb(null, true);
   // } else {
@@ -45,7 +46,11 @@ const fileFilter = (req, file, cb) => {
   // }
 };
 
-const upload = multer({storage, fileFilter});
+const upload = multer({
+  storage,
+  fileFilter,
+  limits: {fileSize: process.env.FILE_UPLOAD_LIMIT * 1024 * 1024}
+});
 
 app.use('/api', router);
 
@@ -53,16 +58,24 @@ router.get('/', async (req, res) => {
   return send(res, 200, "Hi page");
 });
 
-router.post('/upload', upload.single('file'), (req, res) => {
-  try {
-    const {filename} = req.file;
-    const filePath = "uploads/" + filename;
+router.post('/upload', (req, res) => {
+  upload.single('file')(req, res, function (err) {
+    if (err instanceof multer.MulterError && err.code === 'LIMIT_FILE_SIZE') {
+      return send(res, 400, 'File size exceeds the limit.');
+    } else if (err) {
+      console.error('Error uploading file:', err.message);
+      return send(res, 500, 'Error uploading file.');
+    }
 
-    return send(res, 200, filePath);
-  } catch (error) {
-    console.error('Error uploading file:', error.message);
-    return send(res, 500, 'Error uploading file.');
-  }
+    try {
+      const {filename} = req.file;
+      const filePath = "uploads/" + filename;
+      return send(res, 200, filePath);
+    } catch (error) {
+      console.error('Error handling uploaded file:', error.message);
+      return send(res, 500, 'Error handling uploaded file.');
+    }
+  });
 });
 
 const startServer = async () => {

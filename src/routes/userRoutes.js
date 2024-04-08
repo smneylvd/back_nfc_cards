@@ -5,6 +5,8 @@ const router = require('./router');
 const {body, validationResult} = require("express-validator");
 const send = require("../transformers/message");
 const bcrypt = require('bcrypt');
+const path = require('path');
+const fs = require('fs');
 
 
 const prefix = "users";
@@ -65,7 +67,7 @@ router.get(`/${prefix}/profile`, authenticate, async (req, res) => {
       let data = await getUserData(req.user.id);
       return send(res, 200, data);
     } else {
-      return send(res, 404);
+      return send(res, 401);
     }
   } catch (error) {
     console.error('Error fetching user account:', error);
@@ -128,6 +130,21 @@ router.post(`/${prefix}/profile`, [
               [req.user.id, key, attributes[key], new Date(),]
             );
           } else {
+            // in case if user updates avatar, we automatically remove previous file
+            if (key === 'avatar' && attr.rows[0].value && attributes[key] !== attr.rows[0].value) {
+              try {
+                const filename = attr.rows[0].value;
+                const filePath = path.join(__dirname, '../..', filename);
+
+                fs.unlink(filePath, (err) => {
+                  if (err) {
+                    console.error('Error deleting file:', err);
+                  }
+                });
+              } catch (error) {
+                console.error('Error:', error);
+              }
+            }
             await db.query(
               'update content_fields set value = $1 where type = $2 and content_id = $3',
               [attributes[key], key, req.user.id,]

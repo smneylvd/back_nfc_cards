@@ -11,11 +11,10 @@ dotenv.config();
 
 const prefix = "auth"
 router.post(`/${prefix}/login`, [
-  body('password').notEmpty().withMessage('Phone number is required.'),
-  body('login').notEmpty().withMessage('Password is required.')
+  body('login').notEmpty().withMessage('Login is required.'),
+  body('password').notEmpty().withMessage('Password is required.'),
 ], async (req, res) => {
   const {login, password} = req.body;
-
   try {
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
@@ -27,7 +26,6 @@ router.post(`/${prefix}/login`, [
     if (user.rows.length === 0) {
       return send(res, 404);
     }
-
     const validPassword = await bcrypt.compare(password, user.rows[0].password);
 
     if (!validPassword) {
